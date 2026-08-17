@@ -10,23 +10,19 @@ edycja → Stage → Commit → Sync Changes
 #include "driver/ledc.h"
 #include "driver/gpio.h"
 
-#include "servo_drive.h"
+#include "ULN2003.h"
 
 
 void app_main(void)
 {
 
-    servo_drive_init();
+    uln2003_init();
 
 while(1)
 {
-    for(int i = -90; i <=90; i+=15){
-        servo_set_angle(i);
-        vTaskDelay(pdMS_TO_TICKS(50));
-    }
-
-    servo_set_angle(-90);
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    
+        uln2003_step(512);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        uln2003_step(-512);
+        vTaskDelay(pdMS_TO_TICKS(1000));
 }
 }
