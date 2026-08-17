@@ -7,30 +7,26 @@ edycja → Stage → Commit → Sync Changes
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "driver/ledc.h"
+#include "driver/gpio.h"
 
-#include "dht11.h"
+#include "servo_drive.h"
+
 
 void app_main(void)
 {
-    uint8_t humidity;
-    uint8_t temperature;
 
-    dht11_init();
+    servo_drive_init();
 
-    vTaskDelay(pdMS_TO_TICKS(2000));
-
-    while(1){
-
-        int result = dht11_read(&humidity,&temperature);
-
-        if(result == DHT11_OK){
-            printf("Temperature: %d C\n",temperature);
-            printf("Humidity: %d %%\n",humidity);
-        }
-        else{
-            printf("DHT11 error: %d\n",result);
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(2000));
+while(1)
+{
+    for(int i = -90; i <=90; i+=15){
+        servo_set_angle(i);
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
+
+    servo_set_angle(-90);
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    
+}
 }

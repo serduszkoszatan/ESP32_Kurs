@@ -8,6 +8,8 @@ idf_component_register(
         "src/PWM.c"
         "src/analog_read.c"
         "src/dht11.c"
+        "src/dc_motor.c"
+        "src/servo_drive.c"
 
     INCLUDE_DIRS
         "."
