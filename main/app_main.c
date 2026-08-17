@@ -1,3 +1,8 @@
+/*
+Każda kolejna zmiana GitHub:
+edycja → Stage → Commit → Sync Changes
+*/
+
 #include <stdio.h>
 
 #include "freertos/FreeRTOS.h"
