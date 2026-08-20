@@ -1,0 +1,26 @@
+idf_component_register(
+    SRCS
+        "app_main.c"
+        "src/basic/led_button.c"
+        "src/basic/led.c"
+        "src/sensor/obstacle_sensor.c"
+        "src/sensor/ultrasonic_sensor.c"
+        "src/basic/PWM.c"
+        "src/sensor/analog_read.c"
+        "src/sensor/dht11.c"
+        "src/motor/dc_motor.c"
+        "src/motor/servo_drive.c"
+        "src/motor/ULN2003.c"
+        "src/display/led_matrix.c"
+        "src/display/lcd_16x2.c"
+        "src/communication_protocols/UART.c"
+
+    INCLUDE_DIRS
+        "."
+        "inc"
+        "inc/basic"
+        "inc/sensor"
+        "inc/motor"
+        "inc/display"
+        "inc/communication_protocols"
+)

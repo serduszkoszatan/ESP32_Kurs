@@ -61,7 +61,7 @@ void lcd_pulse_enable (void)
     gpio_set_level(ENABLE_PIN, 1);
     ets_delay_us(1);
     gpio_set_level(ENABLE_PIN, 0);
-    ets_delay_us(20);
+    ets_delay_us(50);
 }
 
 // Wysyła 4 bity danych do LCD w trybie 4-bitowym.

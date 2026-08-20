@@ -10,19 +10,14 @@ edycja → Stage → Commit → Sync Changes
 #include "driver/ledc.h"
 #include "driver/gpio.h"
 
-#include "ULN2003.h"
+#include "lcd_16x2.h"
 
 
 void app_main(void)
 {
+   gpio_set_direction(1, GPIO_MODE_INPUT);
+   gpio_set_pull_mode(1,GPIO_PULLDOWN_ONLY);
+   bool ledState = false;
 
-    uln2003_init();
-
-while(1)
-{
-        uln2003_step(512);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        uln2003_step(-512);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-}
+   
 }
