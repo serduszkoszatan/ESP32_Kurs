@@ -3,5 +3,6 @@
 
 void UART_init (void);
 //Inne funkcje użyte w template_file.c
-void UART_write(const char *data);
+void UART_read (void);
+
 #endif

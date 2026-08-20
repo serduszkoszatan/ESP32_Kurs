@@ -33,6 +33,9 @@ Common configurations use 1 or 2 stop bits.
 // INCLUDES
 //================================================
 
+// Własne include
+#include "UART.h"
+
 // Standardowe biblioteki ESP-IDF
 #include "freertos/FreeRTOS.h"  //Podstawowe biblioteki 
 #include "freertos/task.h"      //Podstawowe biblioteki
@@ -41,18 +44,16 @@ Common configurations use 1 or 2 stop bits.
 
 // Standardowe biblioteki C
 #include <stdbool.h>
-
-// Własne include
-#include "UART.h"
+#include <string.h>
 
 //================================================
 // DEFINITIONS
 //================================================
 
 #define UART_PORT UART_NUM_1  
-#define UART_TX_PIN 17  
-#define UART_RX_PIN 18  
-#define BUF_SIZE 1024  
+#define UART_TX_PIN GPIO_NUM_17  
+#define UART_RX_PIN GPIO_NUM_18
+#define BUF_SIZE 1024 
   
 //================================================
 // STATIC VARIABLES
@@ -63,7 +64,13 @@ Common configurations use 1 or 2 stop bits.
 //================================================
 // INITIALIZATION FUNCTIONS
 //================================================
+ 
+//Przypisanie przycisku do PINU 1, tylko na potrzeby kursu, inaczej do wyjebania
 
+
+
+void UART_init (void) {
+//configuration the UART communication settings
 	uart_config_t uart_config = {  
 		.baud_rate = 115200,  
 		.data_bits = UART_DATA_8_BITS,  
@@ -72,9 +79,31 @@ Common configurations use 1 or 2 stop bits.
 		.flow_ctrl = UART_HW_FLOWCTRL_DISABLE,  
 		.source_clk = UART_SCLK_DEFAULT,  
 	};  
-    
 
+// UART_PORT - wybór używanego UART-a, zdefiniowany w definicjach wyżej
+// BUF_SIZE - rozmiar bufora odbiorczego w bajtach, zdefiniowany w definicjach wyżej
+// 0 - brak bufora nadawczego TX.
+// 0 - nie używamy kolejki zdarzeń UART.
+// NULL - brak uchwytu do kolejki zdarzeń.
+// 0 - domyślne ustawienia przerwań.
+	uart_driver_install(UART_PORT, BUF_SIZE, 0, 0, NULL, 0);
+// Wprowadzamy wcześniej przygotowaną konfigurację UART. Przekazujemy port oraz adres struktury uart_config.
+	uart_param_config(UART_PORT, &uart_config);	
+
+	uart_set_pin(
+	UART_PORT,
+	UART_TX_PIN, 
+	UART_RX_PIN,  
+	UART_PIN_NO_CHANGE, 
+	UART_PIN_NO_CHANGE
+	);  
+
+}
 //================================================
 // MAIN FUNCTIONS
 //================================================
 
+void UART_write(const char *data)
+{
+    uart_write_bytes(UART_PORT, data, strlen(data));
+}
