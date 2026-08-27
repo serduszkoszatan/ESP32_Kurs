@@ -14,6 +14,7 @@ idf_component_register(
         "src/display/led_matrix.c"
         "src/display/lcd_16x2.c"
         "src/communication_protocols/UART.c"
+        "src/communication_protocols/SPI.c"
 
     INCLUDE_DIRS
         "."

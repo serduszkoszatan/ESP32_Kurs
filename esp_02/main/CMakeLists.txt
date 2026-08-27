@@ -3,6 +3,7 @@ idf_component_register(
         "main.c"
         "src/template_file.c"
         "src/comunication_protocols/UART.c"
+        "src/comunication_protocols/SPI.c"
 
     INCLUDE_DIRS
         "."
