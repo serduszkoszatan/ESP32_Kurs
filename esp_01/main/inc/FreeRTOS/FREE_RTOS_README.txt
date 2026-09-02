@@ -81,32 +81,55 @@ void app_main(void) {
     vTaskDelete(myTaskHandle); 
 }
 
-Komunikacja między zadaniami: kolejki
-Gdy uruchamiamy wiele zadań, nieuchronnie muszą one udostępniać sobie dane. 
-Na przykład, „Zadanie czujnika” odczytuje dane o temperaturze, a „Zadanie wyświetlacza” wyświetla je na ekranie OLED.
+Pamięć:
+Podczas pracy z ESP32-S3 zrozumienie działania pamięci jest fundamentalne. 
+Pamięć to miejsce, w którym znajduje się kod, zmienne i dane naszego programu podczas pracy układu. 
+Aby to zobrazować, możemy podzielić pamięć na dwie główne przestrzenie robocze: pamięć flash, 
+która pełni funkcję stałej szafki na dokumenty, oraz pamięć RAM (Random Access Memory), 
+która służy jako szybkie, tymczasowe stanowisko pracy.
 
-Możemy przekazać te dane za pomocą zmiennych globalnych. 
-W systemie czasu rzeczywistego (RTOS) zmienne globalne są niebezpieczne. 
-Jeśli zadanie czujnika jest w trakcie aktualizacji zmiennej globalnej, 
-a system czasu rzeczywistego (RTOS) nagle przełączy się na zadanie wyświetlania, 
-zadanie wyświetlania może odczytać uszkodzone lub niekompletne dane.
+Pamięć flash:
+IROM (Code Executed from Flash): To tutaj znajduje się większość naszego wykonywalnego kodu binarnego. 
+    Ponieważ nie możemy zmieścić wszystkiego w wewnętrznej pamięci RAM, ESP32-S3 wykorzystuje specjalny system buforowania, 
+    aby mapować ten kod bezpośrednio do przestrzeni instrukcji. 
+    Pozwala to na wykonywanie aplikacji bezpośrednio z pamięci Flash niemal tak szybko,
+    jak gdyby znajdowała się ona w pamięci wewnętrznej.
+DROM (Data Stored in Flash): To nasza sekcja danych tylko do odczytu. 
+Używamy DROM do przechowywania zmiennych stałych i danych stałych, 
+które nasz program musi odczytać, ale nigdy nie zmieni ani nie wykona.
 
-Aby rozwiązać ten problem, FreeRTOS oferuje kolejki. 
-Kolejka to bezpieczny potok FIFO (First-In-First-Out) między zadaniami.
+RAM
+Pamięć RAM jest wyjątkowo szybka i służy do aktywnych obliczeń oraz obsługi zmiennych tymczasowych. 
+Jednak standardowa pamięć RAM traci wszystkie swoje dane po wyłączeniu zasilania. 
+ESP32-S3 dzieli nasze środowisko pracy z pamięcią RAM na kilka wyspecjalizowanych obszarów, 
+w zależności od tego, co chcemy osiągnąć:
 
-Zadanie wysyłające przesuwa dane na koniec kolejki.
-Zadanie odbierające pobiera dane z początku kolejki.
-Jeśli kolejka jest pusta, zadanie odbiorcze automatycznie przechodzi w stan zablokowany, 
-aż do momentu nadejścia danych, nie marnując czasu procesora.
-
-Kolejki programowania
-Aby pracować z kolejkami, musimy najpierw utworzyć zmienną globalną typu QueueHandle_t. 
-Następnie możemy manipulować kolejką za pomocą trzech głównych funkcji:
-
-xQueueCreate()Tworzy obiekt kolejki. Przyjmuje dwa argumenty: długość kolejki (maksymalną liczbę elementów, które może pomieścić)
-    oraz rozmiar każdego elementu przechowywanego w kolejce.
-xQueueSend()Wysyła nowe dane do kolejki. Przyjmuje trzy argumenty: globalną zmienną kolejki, 
-    dodawane dane oraz wartość limitu czasu, która określa, jak długo funkcja powinna czekać, jeśli kolejka jest pełna.
-xQueueReceive()Odczytuje i pobiera dane z kolejki. Podobnie jak poprzednia funkcja, przyjmuje trzy argumenty: 
-uchwy(handle) kolejki, wskaźnik do miejsca, w którym powinny zostać zapisane odebrane dane, oraz wartość limitu czasu, 
-która określa, jak długo funkcja powinna czekać na dane.
+DRAM (pamięć danych RAM): 
+    To nasza główna przestrzeń robocza dla danych statycznych, danych inicjowanych zerami
+    oraz sterty wykonawczej. Pamięć DRAM jest ściśle połączona z magistralą danych, co oznacza,
+    że ​​nie możemy z niej wykonywać kodu.
+    Jeśli potrzebujemy, aby określone dane przetrwały restart oprogramowania (ciepły rozruch), 
+    możemy wydzielić sekcję „noinit” w pamięci DRAM, aby zapobiec ich skasowaniu podczas uruchamiania. 
+    Ponadto, gdy nasze urządzenia peryferyjne wymagają bezpośredniego dostępu do pamięci (DMA)
+    w celu szybkiego wysyłania lub odbierania danych, musimy starannie umieścić bufory pamięci w pamięci DRAM,
+    aby upewnić się, że są prawidłowo wyrównane i sformatowane.
+IRAM (Instruction RAM): 
+    W przeciwieństwie do DRAM, IRAM jest pamięcią wykonywalną. 
+    Rezerwujemy tę niezwykle cenną przestrzeń dla naszych najważniejszych zadań, 
+    takich jak obsługa przerwań czy kod wrażliwy na czas. Umieszczając te operacje w IRAM, 
+    unikamy drobnych opóźnień związanych z pobieraniem instrukcji z pamięci Flash. 
+    Jest to jednak kwestia równowagi; każde zajęcie przestrzeni na IRAM zmniejsza ilość pamięci DRAM 
+    dostępnej dla danych statycznych i sterty.
+Pamięć RTC (zegar czasu rzeczywistego): 
+        Jest to specjalny podzbiór pamięci RAM o niskim poborze mocy, który pozostaje aktywny nawet wtedy, 
+        gdy resztę układu przełączymy w tryb głębokiego uśpienia.
+    Szybka pamięć RTC: 
+        Używamy tego obszaru dla kodu i danych, 
+        które muszą zostać wykonane natychmiast po wybudzeniu układu z głębokiego uśpienia. 
+        Jeśli nie jest on potrzebny do procedur wybudzania, możemy dodać pozostałą przestrzeń do ogólnego stosu danych, 
+        choć działa on nieco wolniej niż standardowa pamięć DRAM.
+    Pamięć RTC Slow: 
+        Tę głębszą sekcję pamięci wykorzystujemy do przechowywania zmiennych globalnych i statycznych, 
+        które muszą zachować swoje wartości w całym cyklu głębokiego uśpienia, lub do przechowywania danych, 
+        do których musi uzyskać dostęp koprocesor o bardzo niskim poborze mocy (ULP), 
+        gdy główny procesor jest w stanie spoczynku.

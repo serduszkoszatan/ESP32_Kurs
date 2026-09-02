@@ -4,6 +4,39 @@
 // READ ME
 //================================================
 
+/*
+Komunikacja między zadaniami: kolejki
+Gdy uruchamiamy wiele zadań, nieuchronnie muszą one udostępniać sobie dane. 
+Na przykład, „Zadanie czujnika” odczytuje dane o temperaturze, a „Zadanie wyświetlacza” wyświetla je na ekranie OLED.
+
+Możemy przekazać te dane za pomocą zmiennych globalnych. 
+W systemie czasu rzeczywistego (RTOS) zmienne globalne są niebezpieczne. 
+Jeśli zadanie czujnika jest w trakcie aktualizacji zmiennej globalnej, 
+a system czasu rzeczywistego (RTOS) nagle przełączy się na zadanie wyświetlania, 
+zadanie wyświetlania może odczytać uszkodzone lub niekompletne dane.
+
+Aby rozwiązać ten problem, FreeRTOS oferuje kolejki. 
+Kolejka to bezpieczny potok FIFO (First-In-First-Out) między zadaniami.
+
+Zadanie wysyłające przesuwa dane na koniec kolejki.
+Zadanie odbierające pobiera dane z początku kolejki.
+Jeśli kolejka jest pusta, zadanie odbiorcze automatycznie przechodzi w stan zablokowany, 
+aż do momentu nadejścia danych, nie marnując czasu procesora.
+
+Kolejki programowania
+Aby pracować z kolejkami, musimy najpierw utworzyć zmienną globalną typu QueueHandle_t. 
+Następnie możemy manipulować kolejką za pomocą trzech głównych funkcji:
+
+xQueueCreate()Tworzy obiekt kolejki. Przyjmuje dwa argumenty: długość kolejki (maksymalną liczbę elementów, które może pomieścić)
+    oraz rozmiar każdego elementu przechowywanego w kolejce.
+xQueueSend()Wysyła nowe dane do kolejki. Przyjmuje trzy argumenty: globalną zmienną kolejki, 
+    dodawane dane oraz wartość limitu czasu, która określa, jak długo funkcja powinna czekać, jeśli kolejka jest pełna.
+xQueueReceive()Odczytuje i pobiera dane z kolejki. Podobnie jak poprzednia funkcja, przyjmuje trzy argumenty: 
+uchwy(handle) kolejki, wskaźnik do miejsca, w którym powinny zostać zapisane odebrane dane, oraz wartość limitu czasu, 
+która określa, jak długo funkcja powinna czekać na dane.
+
+
+*/
 //================================================
 // INCLUDES
 //================================================
@@ -19,7 +52,7 @@
 // Standardowe biblioteki C
 
 // Własne include
-#include "free_rtos.h"
+#include "queue_examples.h"
 
 //================================================
 // DEFINITIONS
@@ -33,7 +66,7 @@
 // STATIC VARIABLES
 //================================================
 
-QueueHandle_t data_queue;
+QueueHandle_t data_queue;   //Handle for gueqe function producer and consument tasks
 
 //================================================
 // INITIALIZATION FUNCTIONS

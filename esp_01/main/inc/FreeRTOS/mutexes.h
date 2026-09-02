@@ -1,5 +1,5 @@
-#ifndef FREE_RTOS_H
-#define FREE_RTOS_H
+#ifndef MUTEXES_H
+#define MUTEXES_H
 
 //Inne funkcje użyte w template_file.c
 
