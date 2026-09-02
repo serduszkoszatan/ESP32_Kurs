@@ -14,6 +14,9 @@ idf_component_register(
         "src/display/led_matrix.c"
         "src/display/lcd_16x2.c"
         "src/communication_protocols/UART.c"
+        "src/communication_protocols/SPI.c"
+        "src/FreeRTOS/queue_examples.c"
+        "src/FreeRTOS/mutexes.c"
 
     INCLUDE_DIRS
         "."
@@ -23,4 +26,5 @@ idf_component_register(
         "inc/motor"
         "inc/display"
         "inc/communication_protocols"
+        "inc/FreeRTOS"
 )
