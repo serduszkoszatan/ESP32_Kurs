@@ -1,0 +1,199 @@
+Sterta:
+W przeciwieństwie do stosu, który automatycznie przydziela i zwalnia pamięć podczas wywołań funkcji, 
+sterta służy do dynamicznej alokacji pamięci. Pamięć w stercie jest zarządzana ręcznie przez programistę,
+co oznacza, że ​​jawnie żądamy pamięci, gdy jest potrzebna, i zwalniamy ją, gdy nie jest już potrzebna.
+
+W przeciwieństwie do struktury stosu LIFO, sterta to duża pula pamięci,
+w której bloki mogą być alokowane i zwalniane w dowolnej kolejności. 
+Ta elastyczność ma jednak swoją cenę. Alokacja pamięci na stercie jest wolniejsza niż na stosie.
+
+Sterta jest szczególnie przydatna, gdy wymagana ilość pamięci nie jest znana w momencie kompilacji. 
+Zamiast tworzyć zmienne lokalne o stałym rozmiarze, możemy dynamicznie alokować pamięć podczas wykonywania programu. 
+Jest to bardzo powszechne w systemach wbudowanych podczas obsługi buforów, pakietów komunikacyjnych,
+ danych z czujników, przetwarzania obrazu lub tablic o dynamicznym rozmiarze.
+
+W procesorze ESP32-S3, pamięć sterty jest zarządzana przez alokator pamięci ESP-IDF. 
+Funkcje takie jak malloc(), calloc(), realloc()i free()są powszechnie używane do dynamicznego zarządzania pamięcią. 
+ESP-IDF oferuje również zaawansowane funkcje sterty, umożliwiając programistom alokację pamięci z różnych regionów,
+ takich jak wewnętrzna pamięć RAM, pamięć z obsługą DMA czy zewnętrzna pamięć PSRAM.
+
+W przeciwieństwie do stosu, pamięć sterty nie znika automatycznie po zakończeniu funkcji.
+Przydzielona pamięć pozostaje zarezerwowana do momentu jej jawnego zwolnienia za pomocą free().
+Niezwolnienie nieużywanej pamięci sterty powoduje wyciek pamięci, 
+który stopniowo zmniejsza dostępną pamięć i może ostatecznie doprowadzić do awarii systemu.
+
+
+#include <stdio.h>
+#include <stdlib.h>
+
+void app_main(void) {
+
+    // Przydzielamy pamięć na stercie dla 5 zmiennych typu int.
+    // malloc() zwraca adres początku przydzielonego obszaru pamięci.
+    int *numbers = (int *)malloc(5 * sizeof(int));
+
+    // Sprawdzamy, czy malloc() poprawnie przydzielił pamięć.
+    // Jeśli nie, numbers będzie równe NULL i kończymy program.
+    if (numbers == NULL) {
+        printf("Memory allocation failed!\n");
+        return;
+    }
+
+    // Zapisujemy wartości 10, 20, 30, 40 i 50 w przydzielonej pamięci.
+    // numbers[i] pozwala korzystać z pamięci podobnie jak ze zwykłej tablicy.
+    for (int i = 0; i < 5; i++) {
+        numbers[i] = (i + 1) * 10;
+    }
+
+    // Odczytujemy kolejne elementy tablicy i wyświetlamy ich wartości.
+    // Dzięki temu możemy sprawdzić, czy dane zostały poprawnie zapisane.
+    for (int i = 0; i < 5; i++) {
+        printf("numbers[%d] = %d\n", i, numbers[i]);
+    }
+
+    // Zwalniamy pamięć przydzieloną wcześniej przez malloc().
+    // Po free() nie powinniśmy już korzystać z numbers.
+    free(numbers);
+
+    printf("Heap memory released\n");
+}
+
+
+Monitorowanie pamięci sterty w ESP-IDF
+ESP-IDF oferuje wbudowane funkcje monitorowania wykorzystania pamięci sterty w czasie wykonywania. 
+Jest to niezwykle przydatne podczas debugowania wycieków pamięci lub sprawdzania ilości dostępnej wolnej pamięci.
+
+Funkcja  heap_caps_get_free_size()pozwala nam sprawdzać dostępną pamięć sterty w czasie rzeczywistym. 
+Jest to szczególnie ważne w systemach wbudowanych, gdzie zasoby pamięci są ograniczone.
+
+
+#include <stdio.h>
+#include "esp_heap_caps.h"
+
+void app_main(void){
+   printf("Free heap before allocation: %d bytes\n", heap_caps_get_free_size(MALLOC_CAP_8BIT));
+
+   int *data = malloc(10000 * sizeof(int));
+   printf("Free heap after allocation: %d bytes\n", heap_caps_get_free_size(MALLOC_CAP_8BIT));
+   
+   free(data);
+   printf("Free heap after free(): %d bytes\n", heap_caps_get_free_size(MALLOC_CAP_8BIT));
+}
+
+
+Układ ESP32-S3 ma złożoną mapę pamięci, która obejmuje szybką wewnętrzną pamięć SRAM (podzieloną na IRAM i DRAM)
+oraz często wolniejszą, ale znacznie większą, zewnętrzną pamięć PSRAM (RAM SPI).
+
+Aby rozwiązać to ograniczenie, ESP-IDF oferuje potężną funkcję o nazwie heap_caps_malloc(). 
+Funkcja ta pozwala nam jednoznacznie określić, w którym regionie pamięci
+powinny zostać umieszczone nasze dane, poprzez zastosowanie określonych flag możliwości.
+
+
+#include "esp_heap_caps.h"
+void *heap_caps_malloc(size_t size, uint32_t caps);
+//  size:Liczba bajtów, którą chcesz przydzielić.
+//  caps:Maska bitowa flag możliwości pamięci, które określają gdzie i w jaki sposób pamięć jest przydzielana.
+
+
+Przyjrzyjmy się najczęstszym przypadkom użycia sterowania alokacją pamięci sterty w ESP32-S3:
+
+1. Alokacja tylko z wewnętrznej pamięci RAM. Czasami mamy dane krytyczne dla wydajności, do których dostęp musi być jak najszybszy.
+    Domyślnie, jeśli zewnętrzna pamięć PSRAM jest włączona,  malloc()nasze dane mogą być tam umieszczane.
+    Możemy wymusić na alokatorze korzystanie tylko z szybkiej wewnętrznej pamięci DRAM:
+    #include <stdio.h>
+    #include "esp_heap_caps.h"
+    void app_main(void) {
+        // Force allocation strictly in fast internal DRAM
+        int *data = heap_caps_malloc(100 * sizeof(int), MALLOC_CAP_INTERNAL);
+
+        if (data == NULL) {
+            printf("Internal RAM allocation failed!\n");
+            return;
+        }
+
+        // ... use the data ...
+
+        free(data);
+    }
+
+2. Przydzielanie z zewnętrznej pamięci PSRAM.
+    Pamięć wewnętrzna ESP32-S3 jest cenna i zazwyczaj zarezerwowana dla zadań FreeRTOS i szybkich operacji.
+    Jeśli potrzebujemy dużego kawałka pamięci, powinniśmy umieścić go w zewnętrznej pamięci PSRAM.
+    Jest to niezwykle przydatne w przypadku:
+        Duże bufory danych
+        Przetwarzanie obrazu lub bufory ramki kamery
+        Przetwarzanie danych audio
+        Duże pakiety sieciowe
+
+Pierwszą rzeczą, którą musimy zrobić, jest skonfigurowanie i włączenie pamięci PSRAM. W tym celu uruchamiamy następujące polecenie:
+idf.py menuconfig
+Następnie włączamy PSRAM w następujący sposób:
+Component config
+    ESP PSRAM
+        [*] Support for external, SPI-connected RAM
+
+Następnie uzyskujemy dostęp do Mode of SPI RAMi ustawiamy na Octal Mode PSRAM,
+na koniec przechodzimy do SPI RAM config, przechodzimy następnie do SPI RAM access methodi wybieramy:
+
+Make RAM allocatable using heap_caps_malloc..
+Teraz jesteśmy gotowi do użycia pamięci PSRAM:
+
+
+// Allocate a massive buffer in external PSRAM
+int *buffer = heap_caps_malloc(10000 * sizeof(int), MALLOC_CAP_SPIRAM);
+
+if (buffer == NULL) {
+    printf("PSRAM allocation failed!\n");
+} else {
+    printf("Successfully allocated large buffer in PSRAM.\n");
+    free(buffer);
+}
+
+
+3. Alokacja bezpieczna dla DMA. 
+Podczas pracy z urządzeniami peryferyjnymi, takimi jak interfejsy SPI, I2S (audio) czy LCD,
+sprzęt często korzysta z bezpośredniego dostępu do pamięci (DMA). 
+DMA umożliwia urządzeniom peryferyjnym odczyt i zapis pamięci niezależnie od procesora,
+co znacznie przyspiesza transfer danych. 
+Jednak sprzęt DMA może uzyskać dostęp tylko do określonych fizycznych obszarów pamięci.
+
+Jeśli przekażemy standardową pamięć do kontrolera DMA, może on ulec awarii.
+ Musimy jawnie zażądać pamięci obsługującej DMA:
+
+
+// Allocate memory that is physically accessible by DMA hardware
+uint8_t *dma_buffer = heap_caps_malloc(2048, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+
+
+Zwróć uwagę, że użyliśmy operatora bitowego OR ( |) do połączenia flag. 
+Dzięki temu pamięć jest dostępna zarówno przez DMA, jak i znajduje się w wewnętrznej pamięci RAM.
+
+4. Łączenie wielu ograniczeń. 
+Operacja bitowa OR ( |) pozwala nam nakładać na siebie tyle ograniczeń, 
+ile wymaga nasza aplikacja. Na przykład, jeśli potrzebujemy pamięci
+z gwarantowanym dostępem bajtowym (8-bitowym) i ściśle wewnętrznej:
+
+
+// Must be accessible as normal 8-bit memory AND come from internal RAM
+void *p = heap_caps_malloc(512, MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
+
+
+
+Fragmentacja sterty
+Jednym z istotnych problemów związanych z dynamiczną alokacją pamięci jest fragmentacja sterty. 
+Fragmentacja występuje, gdy wiele alokacji i dealokacji o różnych rozmiarach pozostawia niewielkie, 
+niewykorzystane luki w pamięci. Nawet jeśli całkowita wolna pamięć wydaje się wystarczająco duża, 
+może nie być wystarczająco dużego, ciągłego bloku dostępnego na nową alokację.
+
+W długotrwałych aplikacjach ESP32-S3 nadmierna fragmentacja może ostatecznie doprowadzić do błędów alokacji.
+
+Aby zmniejszyć fragmentację:
+    Unikaj wielokrotnego przydzielania i zwalniania pamięci w szybkich pętlach.
+    W miarę możliwości należy ponownie wykorzystywać bufory.
+    W przypadku przewidywalnych systemów należy preferować pule pamięci o stałym rozmiarze.
+    Zwolnij nieużywaną pamięć tak szybko, jak to możliwe.
+    Monitoruj użycie sterty w czasie wykonywania.
+Efektywne zarządzanie pamięcią ma ogromne znaczenie w systemach wbudowanych, 
+ponieważ zasoby pamięci są ograniczone w porównaniu z komputerami stacjonarnymi.
+Niewłaściwe zarządzanie pamięcią może prowadzić do awarii, niestabilności,
+nieoczekiwanych restartów lub spadku wydajności systemu.
